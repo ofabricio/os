@@ -31,27 +31,73 @@ use16
 ; are affected as if it was put at the given address.
 org 0x7C00
 
+KERNEL_OFFSET = 0x1000
+
+    mov [boot_drive], dl    ; BIOS sets the boot drive in DL on boot.
+                            ; Let's save it since it may get overwritten.
+
     ; Init stack.
-    mov bp, 0x7E00 + 512    ; Alloc 512 bytes for stack in Free space above boot sector.
+    mov bp, 0x8000          ; 0x7E00 + 512. Alloc 512 bytes for stack in Free space above boot sector.
     mov sp, bp
 
-    ; BIOS sets DL to the drive number before calling the bootloader.
-    mov bx, 0x9000          ; ES:BX = 0x0000:0x9000 = 0x9000
-    mov dh, 2               ; Read 2 sectors.
+    ; Read kernel from disk.
+    mov bx, KERNEL_OFFSET   ; Address to where the data loaded from disk will be stored in memory.
+    mov dh, 15              ; Read 15 sectors.
+    mov dl, [boot_drive]
     call disk_load
 
-    ; Debug: print the first bytes of each loaded sector
-    mov bx, [0x9000]
-    call print_hex
-    call printnl
-    mov bx, [0x9000 + 512]
-    call print_hex
+    ; Enable A20 Line.
 
-    hlt
+    in al, 0x92
+    or al, 2
+    out 0x92, al
+
+    ; Switching to PM.
+
+    cli     ; We must switch off interrupts until we have
+            ; set-up the protected mode interrupt vector
+            ; otherwise interrupts will run riot.
+
+    lgdt [gdt_descriptor] ; Load our global descriptor table, which defines
+                          ; the protected mode segments (e.g. for code and data)
+
+    mov eax, cr0          ; To make the switch to protected mode, we set
+    or eax, 1             ; the first bit of CR0, a control register.
+    mov cr0, eax
+
+    jmp CODE_SEG:init_pm  ; Make a far jump (i.e. to a new segment) to our 32-bit
+                          ; code. This also forces the CPU to flush its cache of
+                          ; pre-fetched and real-mode decoded instructions,
+                          ; which can cause problems.
 
 
 include 'diskload.asm'
+include 'gdt.asm'
+
 include 'print_int.asm'
+include 'print_32bits.asm'
+
+
+use32
+
+init_pm:
+
+    ; Initialise registers and the stack once in PM.
+    mov ax, DATA_SEG    ; Now in PM, our old segments are meaningless,
+    mov ds, ax          ; so we point our segment registers to the
+    mov ss, ax          ; data selector we defined in our GDT.
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+    mov ebp, 0x90000    ; Update our stack position so it is right
+    mov esp, ebp        ; at the top of the free space.
+
+    call kernel         ; Give control to the kernel
+
+    hlt                 ; Stay here when the kernel returns control to us (if ever)
+
+
+    boot_drive db 0     ; Store the boot drive number since DL may get overwritten
 
     ; Fill this sector up (510 bytes)
     rb 510 - ($ - $$)
@@ -59,8 +105,22 @@ include 'print_int.asm'
     ; BIOS signature at end of the boot sector (2 bytes)
     dw 0xAA55
 
-; -- Fill up some bytes just to check if we loaded these sectors.
+; ---
+;       Here's the end of the Sector 1 (512 bytes) and the start of Sector 2,
+;       which is loaded in KERNEL_OFFSET in memory.
+; ---
 
-    ; Boot sector = sector 1 of cyl 0 of head 0 of hdd 0
-    times 256 dw 0xAA02     ; Sector 2 (512 bytes)
-    times 256 dw 0xBB03     ; Sector 3 (512 bytes)
+use32
+org KERNEL_OFFSET
+
+kernel:
+
+    mov ebx, msg_prot_mode
+    call print_string_pm
+
+    hlt
+
+    msg_prot_mode db "Landed in 32-bit Protected Mode", 0
+
+    ; Fill 2 sectors up (1kb)
+    ; times 512 * 2 - ($ - kernel) db 0

@@ -1,3 +1,5 @@
+use16
+
 ; Collection of functions to print characters with
 ; BIOS INT instructions in 16-bits real mode.
 

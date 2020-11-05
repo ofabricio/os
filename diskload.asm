@@ -1,10 +1,12 @@
+use16
+
 ; Load DH sectors from drive DL into ES:BX.
 disk_load:
     pusha
     push dx
 
     mov ah, 0x02    ; 0x02 = int 0x13 function "Read Disk Sectors": https://stanislavs.org/helppc/int_13-2.html
-    mov al, dh      ; Number of sectors to read (1 to 128).
+    mov al, dh      ; Number of sectors to read (1 to 128). Caller sets it.
     mov cl, 2       ; Sector number (1 to 17).
                     ; 1 is our boot sector, 2 is the first 'available' sector.
     mov ch, 0       ; Track/Cylinder number (0 to 1023).

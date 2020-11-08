@@ -8,17 +8,17 @@ use16
 ;
 ;          |                Free               |
 ; 0x100000 +-----------------------------------+
-;          |           BIOS (256 kb)           |
+;          |          BIOS (~262 kb)           |
 ;  0xC0000 +-----------------------------------+
-;          |       Video Memory (128 kb)       |
+;          |       Video Memory (~131 kb)      |
 ;  0xA0000 +-----------------------------------+
-;          | Extendend BIOS Data Area (639 kb) |
+;          |  Extendend BIOS Data Area (1 kb)  |
 ;  0x9FC00 +-----------------------------------+
-;          |           Free (638 kb)           | <- This code stack is here.
+;          |           Free (~622 kb)          |
 ;   0x7E00 +-----------------------------------+
-;          |  Loaded Boot Sector (512 bytes)   | <- This code is loaded here.
+;          |  Loaded Boot Sector (512 bytes)   | <- This code first sector is automatically loaded here by BIOS.
 ;   0x7C00 +-----------------------------------+
-;          |                                   |
+;          |           Free (~30kb)            | <- This code stack is here.
 ;    0x500 +-----------------------------------+
 ;          |     BIOS Data Area (256 bytes)    |
 ;    0x400 +-----------------------------------+
@@ -29,15 +29,22 @@ use16
 ;
 ; All the labels defined within this directive and the value of $ symbol
 ; are affected as if it was put at the given address.
-org 0x7C00
+org 0x7C00  ; 0000h:7C00h
 
-KERNEL_OFFSET = 0x1000
+KERNEL_OFFSET = 0x7E00
 
+    boot_drive db 0x90      ; Store the boot drive number since DL may get overwritten
     mov [boot_drive], dl    ; BIOS sets the boot drive in DL on boot.
                             ; Let's save it since it may get overwritten.
 
+    ; Init segments.
+    xor ax, ax
+    mov ds, ax
+    mov es, ax
+    mov ss, ax
+
     ; Init stack.
-    mov bp, 0x8000          ; 0x7E00 + 512. Alloc 512 bytes for stack in Free space above boot sector.
+    mov bp, 0x7C00          ; Alloc 512 bytes for stack in Free space above boot sector.
     mov sp, bp
 
     ; Read kernel from disk.
@@ -65,22 +72,13 @@ KERNEL_OFFSET = 0x1000
     or eax, 1             ; the first bit of CR0, a control register.
     mov cr0, eax
 
-    jmp CODE_SEG:init_pm  ; Make a far jump (i.e. to a new segment) to our 32-bit
-                          ; code. This also forces the CPU to flush its cache of
-                          ; pre-fetched and real-mode decoded instructions,
-                          ; which can cause problems.
-
-
-include 'diskload.asm'
-include 'gdt.asm'
-
-include 'print_int.asm'
-include 'print_32bits.asm'
-
+    jmp CODE_SEG:pm_entrypoint  ; Make a far jump (i.e. to a new segment) to our 32-bit
+                                ; code. This also forces the CPU to flush its cache of
+                                ; pre-fetched and real-mode decoded instructions,
+                                ; which can cause problems.
 
 use32
-
-init_pm:
+pm_entrypoint:
 
     ; Initialise registers and the stack once in PM.
     mov ax, DATA_SEG    ; Now in PM, our old segments are meaningless,
@@ -92,12 +90,27 @@ init_pm:
     mov ebp, 0x90000    ; Update our stack position so it is right
     mov esp, ebp        ; at the top of the free space.
 
-    call kernel         ; Give control to the kernel
+    ; Enter Long Mode.
+    call detect_CPUID
+    call detect_Long_Mode
+    call setup_identity_paging
+    call set_gdt_64
 
-    hlt                 ; Stay here when the kernel returns control to us (if ever)
+    jmp CODE_SEG:lm_entrypoint
 
 
-    boot_drive db 0     ; Store the boot drive number since DL may get overwritten
+use64
+lm_entrypoint:
+
+    jmp kernel         ; Give control to the kernel
+
+
+include 'diskload.asm'
+include 'print_int.asm'
+;include 'print_32bits.asm'
+use32
+include 'gdt.asm'
+include 'cpuid.asm'
 
     ; Fill this sector up (510 bytes)
     rb 510 - ($ - $$)
@@ -110,17 +123,19 @@ init_pm:
 ;       which is loaded in KERNEL_OFFSET in memory.
 ; ---
 
-use32
+use64
 org KERNEL_OFFSET
 
 kernel:
 
-    mov ebx, msg_prot_mode
-    call print_string_pm
+    mov edi, 0xB8000
+    mov rax, 0x1F201F201F201F20
+    mov ecx, 500
+    rep stosq                     ; Clear the screen.
+
+    ; mov ebx, msg_prot_mode
+    ; call print_string_pm
 
     hlt
 
-    msg_prot_mode db "Landed in 32-bit Protected Mode", 0
-
-    ; Fill 2 sectors up (1kb)
-    ; times 512 * 2 - ($ - kernel) db 0
+    ; msg_prot_mode db "Landed in 32-bit Protected Mode", 0

@@ -1,5 +1,3 @@
-use16
-
 gdt_start:
     ; The GDT starts with a null 8-byte.
     dd 0x0
@@ -32,7 +30,7 @@ gdt_end:
 
 gdt_descriptor:
     dw gdt_end - gdt_start - 1 ; Size of GDT, always one less of its true size
-    dd gdt_start               ; Start address of GDT
+    dq gdt_start               ; Start address of GDT
 
 ; Define some handy constants for the GDT segment descriptor offsets, which
 ; are what segment registers must contain when in protected mode. For example,
@@ -41,3 +39,8 @@ gdt_descriptor:
 ; case is the DATA segment (0x0 -> NULL; 0x08 -> CODE; 0x10 -> DATA)
 CODE_SEG = gdt_code - gdt_start
 DATA_SEG = gdt_data - gdt_start
+
+set_gdt_64:
+    mov byte [gdt_code + 6], 10101111b
+    mov byte [gdt_data + 6], 10101111b
+    ret

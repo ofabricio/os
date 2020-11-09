@@ -4,52 +4,55 @@ format binary as 'img'
 ; Let's generate only 16-bit code from here on.
 use16
 
+BOOTSECTOR_OFFSET   = 0x7C00
+PM_STACK_OFFSET     = 0x7C00        ; Protected Mode Stack offset.
+KERNEL_OFFSET       = 0x7E00
+
 ; Typical lower memory layout after boot:
 ;
-;          |                Free               |
-; 0x100000 +-----------------------------------+
-;          |          BIOS (~262 kb)           |
-;  0xC0000 +-----------------------------------+
-;          |       Video Memory (~131 kb)      |
-;  0xA0000 +-----------------------------------+
-;          |  Extendend BIOS Data Area (1 kb)  |
-;  0x9FC00 +-----------------------------------+
-;          |           Free (~622 kb)          |
-;   0x7E00 +-----------------------------------+
-;          |  Loaded Boot Sector (512 bytes)   | <- This code first sector is automatically loaded here by BIOS.
-;   0x7C00 +-----------------------------------+
-;          |           Free (~30kb)            | <- This code stack is here.
-;    0x500 +-----------------------------------+
-;          |     BIOS Data Area (256 bytes)    |
-;    0x400 +-----------------------------------+
-;          |   Interrupt Vector Table (1 kb)   |
 ;      0x0 +-----------------------------------+
+;          |   Interrupt Vector Table (1 kb)   |
+;    0x400 +-----------------------------------+
+;          |     BIOS Data Area (256 bytes)    |
+;    0x500 +-----------------------------------+
+;          |           Free (~30kb)            | <- This code stack is here.
+;   0x7C00 +-----------------------------------+
+;          |  Loaded Boot Sector (512 bytes)   | <- This code first sector is automatically loaded here by BIOS.
+;   0x7E00 +-----------------------------------+
+;          |           Free (~622 kb)          | <- Kernel is loaded here.
+;  0x9FC00 +-----------------------------------+
+;          |  Extendend BIOS Data Area (1 kb)  |
+;  0xA0000 +-----------------------------------+
+;          |       Video Memory (~131 kb)      |
+;  0xC0000 +-----------------------------------+
+;          |          BIOS (~262 kb)           |
+; 0x100000 +-----------------------------------+
+;          |                Free               |
 ;
 ; The BIOS copies this 512 bytes boot sector to the address 0x7C00 and runs it.
 ;
 ; All the labels defined within this directive and the value of $ symbol
 ; are affected as if it was put at the given address.
-org 0x7C00  ; 0000h:7C00h
+org BOOTSECTOR_OFFSET       ; 0000h:7C00h
 
-KERNEL_OFFSET = 0x7E00
-
-    boot_drive db 0x90      ; Store the boot drive number since DL may get overwritten
+    boot_drive db 0x90      ; Store the boot drive number since DL may get overwritten.
     mov [boot_drive], dl    ; BIOS sets the boot drive in DL on boot.
-                            ; Let's save it since it may get overwritten.
 
     ; Init segments.
     xor ax, ax
     mov ds, ax
-    mov es, ax
     mov ss, ax
 
     ; Init stack.
-    mov bp, 0x7C00          ; Alloc 512 bytes for stack in Free space above boot sector.
+    mov bp, BOOTSECTOR_OFFSET ; Alloc stack in Free space below boot sector.
     mov sp, bp
 
     ; Read kernel from disk.
-    mov bx, KERNEL_OFFSET   ; Address to where the data loaded from disk will be stored in memory.
-    mov dh, 15              ; Read 15 sectors.
+    mov ax, KERNEL_OFFSET shr 4 ; 07E0h -> 7E00h:0000h. We change the segment so that
+    mov es, ax                  ; we can load 65kb. If we used 0000h:7E00h there would
+                                ; be only ~30kb (7E00h - FFFFh) available in the segment.
+    mov bx, 0               ; Offset [es:bx] to where the data loaded from disk will be stored in memory.
+    mov al, 65              ; Read 65 sectors (~33kb).
     mov dl, [boot_drive]
     call disk_load
 
@@ -87,8 +90,8 @@ pm_entrypoint:
     mov es, ax
     mov fs, ax
     mov gs, ax
-    mov ebp, 0x90000    ; Update our stack position so it is right
-    mov esp, ebp        ; at the top of the free space.
+    mov ebp, PM_STACK_OFFSET ; Update stack position.
+    mov esp, ebp
 
     ; Enter Long Mode.
     call detect_CPUID

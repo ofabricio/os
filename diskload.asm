@@ -1,20 +1,19 @@
 use16
 
 ; Load DH sectors from drive DL into ES:BX.
+;
+;    In: AL      Number of sectors to read.
+;    In: DL      Drive number (0 = floppy, 1 = floppy2, 0x80 = hdd, 0x81 = hdd2).
+;    In: [ES:BX] Address where the data will be stored.
 disk_load:
-    pusha
-    push dx
+    push ax
 
     mov ah, 0x02    ; 0x02 = int 0x13 function "Read Disk Sectors": https://stanislavs.org/helppc/int_13-2.html
-    mov al, dh      ; Number of sectors to read (1 to 128). Caller sets it.
+    mov ch, 0       ; Track/Cylinder number (0 to 1023).
     mov cl, 2       ; Sector number (1 to 17).
                     ; 1 is our boot sector, 2 is the first 'available' sector.
-    mov ch, 0       ; Track/Cylinder number (0 to 1023).
-    ; DL = drive number. Caller sets it as a parameter and gets it from BIOS.
-    ; (0 = floppy, 1 = floppy2, 0x80 = hdd, 0x81 = hdd2)
     mov dh, 0x00    ; Head number (0x0 .. 0xF)
-
-    ; [ES:BX] = pointer to buffer where the data will be stored. Caller sets it.
+    ; Caller sets AL, DL and [ES:BX]
     int 0x13        ; BIOS disk interrupt
     jc .disk_error
 
@@ -24,17 +23,16 @@ disk_load:
     ; CF = 0 if successful
     ;    = 1 if error
 
-    pop dx
-    cmp al, dh
+    pop cx
+    cmp al, cl
     jne .sectors_error
-    popa
     ret
 
 .disk_error:
     mov bx, .DISK_ERROR
     call print
     call printnl
-    mov dx, ax          ; AH = error code
+    mov bx, ax          ; AH = error code
     call print_hex      ; See the code at http://stanislavs.org/helppc/int_13-1.html
     jmp .disk_loop
 
@@ -43,7 +41,7 @@ disk_load:
     call print
 
 .disk_loop:
-    jmp $
+    hlt
 
 
 .DISK_ERROR: db "Disk read error", 0

@@ -52,7 +52,7 @@ org BOOTSECTOR_OFFSET       ; 0000h:7C00h
     mov es, ax                  ; we can load 65kb. If we used 0000h:7E00h there would
                                 ; be only ~30kb (7E00h - FFFFh) available in the segment.
     mov bx, 0               ; Offset [es:bx] to where the data loaded from disk will be stored in memory.
-    mov al, 65              ; Read 65 sectors (~33kb).
+    mov al, 64              ; Read 64 sectors (~33kb). Need more sectors? Then: https://wiki.osdev.org/ATA_in_x86_RealMode_(BIOS)#LBA_in_Extended_Mode
     mov dl, [boot_drive]
     call disk_load
 
@@ -93,10 +93,7 @@ pm_entrypoint:
     mov ebp, PM_STACK_OFFSET ; Update stack position.
     mov esp, ebp
 
-    ; Enter Long Mode.
-    call detect_CPUID
-    call detect_Long_Mode
-    call setup_identity_paging
+    call enable_long_mode
     call set_gdt_64
 
     jmp CODE_SEG:lm_entrypoint
@@ -108,12 +105,13 @@ lm_entrypoint:
     jmp kernel         ; Give control to the kernel
 
 
+use16
 include 'diskload.asm'
 include 'print_int.asm'
 ;include 'print_32bits.asm'
 use32
 include 'gdt.asm'
-include 'cpuid.asm'
+include 'longmode.asm'
 
     ; Fill this sector up (510 bytes)
     rb 510 - ($ - $$)

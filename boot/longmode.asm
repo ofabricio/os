@@ -2,6 +2,13 @@ use32
 
 ; Source: https://wiki.osdev.org/Setting_Up_Long_Mode
 
+enable_long_mode:
+    call detect_CPUID
+    call detect_Long_Mode
+    call setup_identity_paging
+    ret
+
+
 ; Check if CPUID is supported by attempting to flip the ID bit (bit 21)
 ; in the FLAGS register. If we can flip it, CPUID is available.
 detect_CPUID:
@@ -105,8 +112,6 @@ setup_identity_paging:
     ; Now paging is set up, but it isn't enabled yet.
     ; We will enable it in the next lines.
 
-; No PML5? Yes.
-
     ; Entering compatibility mode:
     mov ecx, 0xC0000080          ; 0xC0000080 is the EFER MSR.
     rdmsr                        ; Read from the model-specific register.
@@ -119,4 +124,3 @@ setup_identity_paging:
     mov cr0, eax
 
     ret
-    ; Entering the 64-bit submode:

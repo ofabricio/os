@@ -1,0 +1,2 @@
+boot: floppy
+floppya: type=1_44, 1_44="C:\Users\Cliente\Projects\os\bin\os.img", status=inserted, write_protected=0

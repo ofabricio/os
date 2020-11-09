@@ -15,7 +15,7 @@ KERNEL_OFFSET       = 0x7E00
 ;    0x400 +-----------------------------------+
 ;          |     BIOS Data Area (256 bytes)    |
 ;    0x500 +-----------------------------------+
-;          |           Free (~30kb)            | <- This code stack is here.
+;          |           Free (~30kb)            | <- Boot sector stack is here.
 ;   0x7C00 +-----------------------------------+
 ;          |  Loaded Boot Sector (512 bytes)   | <- This code first sector is automatically loaded here by BIOS.
 ;   0x7E00 +-----------------------------------+
@@ -128,15 +128,3 @@ use64
 org KERNEL_OFFSET
 
 kernel:
-
-    mov edi, 0xB8000
-    mov rax, 0x1F201F201F201F20
-    mov ecx, 500
-    rep stosq                     ; Clear the screen.
-
-    ; mov ebx, msg_prot_mode
-    ; call print_string_pm
-
-    hlt
-
-    ; msg_prot_mode db "Landed in 32-bit Protected Mode", 0

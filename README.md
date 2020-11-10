@@ -10,4 +10,4 @@ Use either [bochs](http://bochs.sourceforge.net) or [qemu](https://www.qemu.org/
 
 ## Installing gcc cross-compiler for Windows
 
-For compiling c code into Elf format on Windows see [Wiki](https://github.com/ofabricio/os/wiki/Installing-gcc-cross-compiler-for-Windows).
+This is importat for cross-compiling c code into Elf format on Windows. See [Wiki](https://github.com/ofabricio/os/wiki/Installing-gcc-cross-compiler-for-Windows).

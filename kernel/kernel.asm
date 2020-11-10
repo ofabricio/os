@@ -1,12 +1,12 @@
-format ELF64
+use64
 
-section '.text' executable
+section	.text
 
-public main
+global main:
 main:
 
     mov eax, 0xB8000
-    mov rbx, 0x5050505050505050
+    mov rbx, 0x4840404040404040
     mov qword [eax], rbx
 
     ret

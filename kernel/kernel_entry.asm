@@ -1,11 +1,11 @@
-format ELF64
+use64
 
-section '.text' executable
+section	.text
 
-public _start
+global _start:
 _start:
 
-extrn main
+extern main
 
     call main
     hlt

@@ -2,7 +2,7 @@ My Operating System.
 
 ## Code
 
-The assembly code is in [FASM](https://flatassembler.net) syntax.
+The assembly code is in [NASM](https://www.nasm.us) syntax.
 
 ## Emulator
 

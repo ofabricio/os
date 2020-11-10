@@ -21,7 +21,7 @@ detect_CPUID:
     mov ecx, eax
  
     ; Flip the ID bit
-    xor eax, 1 shl 21
+    xor eax, 1 << 21
 
     ; Copy EAX to FLAGS via the stack
     push eax
@@ -58,7 +58,7 @@ detect_Long_Mode:
     ; Now that we know that extended function is available we can use it to detect long mode:
     mov eax, 0x80000001
     cpuid
-    test edx, 1 shl 29      ; Test if the LM-bit, which is bit 29, is set.
+    test edx, 1 << 29      ; Test if the LM-bit, which is bit 29, is set.
     jz .no_long_mode       ; They aren't, there is no long mode.
     ret
 .no_long_mode:
@@ -107,7 +107,7 @@ setup_identity_paging:
 
     ; Now we should enable PAE-paging by setting the PAE-bit in the fourth control register:
     mov eax, cr4
-    or eax, 1 shl 5      ; Set the PAE-bit, which is the 6th bit (bit 5).
+    or eax, 1 << 5      ; Set the PAE-bit, which is the 6th bit (bit 5).
     mov cr4, eax
     ; Now paging is set up, but it isn't enabled yet.
     ; We will enable it in the next lines.
@@ -115,12 +115,12 @@ setup_identity_paging:
     ; Entering compatibility mode:
     mov ecx, 0xC0000080          ; 0xC0000080 is the EFER MSR.
     rdmsr                        ; Read from the model-specific register.
-    or eax, 1 shl 8               ; Set the LM-bit which is the 9th bit (bit 8).
+    or eax, 1 << 8               ; Set the LM-bit which is the 9th bit (bit 8).
     wrmsr                        ; Write to the model-specific register.
 
     ; Enable paging:
     mov eax, cr0
-    or eax, 1 shl 31              ; Set the PG-bit, which is the 32nd bit (bit 31).
+    or eax, 1 << 31              ; Set the PG-bit, which is the 32nd bit (bit 31).
     mov cr0, eax
 
     ret

@@ -8,15 +8,18 @@ os-image: boot.bin kernel.bin
 kernel.bin: kernel_entry.o kernel.o
 	x86_64-elf-ld --oformat binary -Ttext 0x7E00 bin/kernel_entry.o bin/kernel.o -o bin/kernel.bin
 
+kernel.asm.o:
+	nasm kernel/kernel.asm -f elf64 -o bin/kernel.o
+
 kernel.o: kernel/kernel.c
 	x86_64-elf-gcc -m64 -ffreestanding -c $^ -o bin/kernel.o
 	objcopy --remove-section .eh_frame bin/kernel.o
 
 kernel_entry.o: kernel/kernel_entry.asm
-	fasm.x64 $^ bin/kernel_entry.o
+	nasm $^ -f elf64 -o bin/kernel_entry.o
 
 boot.bin:
-	fasm.x64 boot/boot.asm bin/boot.bin
+	nasm -i boot/ -f bin boot/boot.asm -o bin/boot.bin
 
 clean:
 	rm bin/*.bin bin/*.o bin/*.img

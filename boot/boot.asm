@@ -1,12 +1,10 @@
-format binary as 'img'
-
 ; At boot time the CPU runs in 16-bit real mode.
 ; Let's generate only 16-bit code from here on.
 use16
 
-BOOTSECTOR_OFFSET   = 0x7C00
-PM_STACK_OFFSET     = 0x7C00        ; Protected Mode Stack offset.
-KERNEL_OFFSET       = 0x7E00
+BOOTSECTOR_OFFSET   equ 0x7C00
+PM_STACK_OFFSET     equ 0x7C00        ; Protected Mode Stack offset.
+KERNEL_OFFSET       equ 0x7E00
 
 ; Typical lower memory layout after boot:
 ;
@@ -48,7 +46,7 @@ org BOOTSECTOR_OFFSET       ; 0000h:7C00h
     mov sp, bp
 
     ; Read kernel from disk.
-    mov ax, KERNEL_OFFSET shr 4 ; 07E0h -> 7E00h:0000h. We change the segment so that
+    mov ax, KERNEL_OFFSET >> 4  ; 07E0h -> 7E00h:0000h. We change the segment so that
     mov es, ax                  ; we can load 65kb. If we used 0000h:7E00h there would
                                 ; be only ~30kb (7E00h - FFFFh) available in the segment.
     mov bx, 0               ; Offset [es:bx] to where the data loaded from disk will be stored in memory.
@@ -102,19 +100,19 @@ pm_entrypoint:
 use64
 lm_entrypoint:
 
-    jmp kernel         ; Give control to the kernel
+    jmp KERNEL_OFFSET       ; Give control to the kernel
 
 
 use16
-include 'diskload.asm'
-include 'print_int.asm'
+%include 'diskload.asm'
+%include 'print_int.asm'
 ;include 'print_32bits.asm'
 use32
-include 'gdt.asm'
-include 'longmode.asm'
+%include 'gdt.asm'
+%include 'longmode.asm'
 
     ; Fill this sector up (510 bytes)
-    rb 510 - ($ - $$)
+    times 510 - ($ - $$) db 0
 
     ; BIOS signature at end of the boot sector (2 bytes)
     dw 0xAA55
@@ -123,8 +121,3 @@ include 'longmode.asm'
 ;       Here's the end of the Sector 1 (512 bytes) and the start of Sector 2,
 ;       which is loaded in KERNEL_OFFSET in memory.
 ; ---
-
-use64
-org KERNEL_OFFSET
-
-kernel:

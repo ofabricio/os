@@ -32,9 +32,9 @@ val_to_hex_str:
     mov ax, bx      ; BX comes from the caller.
     and al, 0x0F
     cmp al, 0x09    ; 0x01 to 0x09 jump; 0x0A to 0x0F no jump
-    jle @f
+    jle .f
     add al,  7      ; 65 (ASCII 'A') - 48 (ASCII '0') - 10 (0x0A offset) = 7
-@@: add al, 48      ; 48 = ASCII '0'
+.f: add al, 48      ; 48 = ASCII '0'
 
     ; Move result to output.
     mov [di], al
@@ -52,14 +52,14 @@ val_to_hex_str:
 ; Print a zero-terminated string pointed by BX.
 print:
     push bx
-@@: mov al, [bx]
+.b: mov al, [bx]
     cmp al, 0
-    je @f
+    je .f
     mov ah, 0x0E
     int 0x10
     add bx, 1
-    jmp @b
-@@: pop bx
+    jmp .b
+.f: pop bx
     ret
 
 

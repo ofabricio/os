@@ -1,14 +1,31 @@
+%ifndef __PRINT__
+%define __PRINT__
+
 use16
+
+; Prints a string.
+;   In: [ES:SI]     Pointer to the first charater.
+Print:
+    cld
+    pushad
+.b: lodsb           ; Load the value at [ES:SI] in AL.
+    test al, al     ; If AL is the terminator character, stop printing.
+    je .f                  	
+    mov ah, 0x0E	; https://stanislavs.org/helppc/int_10-e.html
+    int 0x10
+    jmp .b          ; Loop till the null character not found.
+.f: popad
+    ret
 
 ; Collection of functions to print characters with
 ; BIOS INT instructions in 16-bits real mode.
 
 ; Prints BX in hexadecimal.
-print_hex:
+PrintHex:
     push bx
     call val_to_hex_str
-    mov bx, HEX_OUT
-    call print
+    mov si, HEX_OUT
+    call Print
     pop bx
     ret
 
@@ -48,29 +65,6 @@ val_to_hex_str:
     popa
     ret
 
-
-; Print a zero-terminated string pointed by BX.
-print:
-    push bx
-.b: mov al, [bx]
-    cmp al, 0
-    je .f
-    mov ah, 0x0E
-    int 0x10
-    add bx, 1
-    jmp .b
-.f: pop bx
-    ret
-
-
-; Print a new line character '\r\n'.
-printnl:
-    mov ah, 0x0E ; https://stanislavs.org/helppc/int_10-e.html
-    mov al, 0x0D ; '\r'
-    int 0x10
-    mov al, 0x0A ; '\n'
-    int 0x10
-    ret
-
-
 HEX_OUT db '0x0000', 0
+
+%endif

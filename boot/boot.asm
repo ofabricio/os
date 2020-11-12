@@ -2,9 +2,10 @@
 ; Let's generate only 16-bit code from here on.
 use16
 
-BOOTSECTOR_OFFSET   equ 0x7C00
-PM_STACK_OFFSET     equ 0x7C00        ; Protected Mode Stack offset.
-KERNEL_OFFSET       equ 0x7E00
+BOOTSECTOR   equ 0x7C00
+PM_STACK     equ 0x7C00             ; Protected Mode Stack offset.
+FREESPACE    equ BOOTSECTOR + 512   ; 0x7E00
+KERNEL       equ FREESPACE + 512    ; 0x8000
 
 ; Typical lower memory layout after boot:
 ;
@@ -31,85 +32,40 @@ KERNEL_OFFSET       equ 0x7E00
 ;
 ; All the labels defined within this directive and the value of $ symbol
 ; are affected as if it was put at the given address.
-org BOOTSECTOR_OFFSET       ; 0000h:7C00h
+org BOOTSECTOR              ; 0000h:7C00h
 
-    boot_drive db 0x90      ; Store the boot drive number since DL may get overwritten.
-    mov [boot_drive], dl    ; BIOS sets the boot drive in DL on boot.
+Main:
+
+    jmp 0x0000:.FlushCS     ; Some BIOS' may load us at 0x0000:0x7C00 while other may load us at 0x07C0:0x0000.
+                            ; Do a far jump to fix this issue, and reload CS to 0x0000.
+
+.FlushCS:
+    BootDrive db 0x90       ; Store the boot drive number since DL may get overwritten.
+    mov [BootDrive], dl     ; BIOS sets the boot drive in DL on boot.
 
     ; Init segments.
     xor ax, ax
     mov ds, ax
-    mov ss, ax
-
-    ; Init stack.
-    mov bp, BOOTSECTOR_OFFSET ; Alloc stack in Free space below boot sector.
-    mov sp, bp
-
-    ; Read kernel from disk.
-    mov ax, KERNEL_OFFSET >> 4  ; 07E0h -> 7E00h:0000h. We change the segment so that
-    mov es, ax                  ; we can load 65kb. If we used 0000h:7E00h there would
-                                ; be only ~30kb (7E00h - FFFFh) available in the segment.
-    mov bx, 0               ; Offset [es:bx] to where the data loaded from disk will be stored in memory.
-    mov al, 64              ; Read 64 sectors (~33kb). Need more sectors? Then: https://wiki.osdev.org/ATA_in_x86_RealMode_(BIOS)#LBA_in_Extended_Mode
-    mov dl, [boot_drive]
-    call disk_load
-
-    ; Enable A20 Line.
-
-    in al, 0x92
-    or al, 2
-    out 0x92, al
-
-    ; Switching to PM.
-
-    cli     ; We must switch off interrupts until we have
-            ; set-up the protected mode interrupt vector
-            ; otherwise interrupts will run riot.
-
-    lgdt [gdt_descriptor] ; Load our global descriptor table, which defines
-                          ; the protected mode segments (e.g. for code and data)
-
-    mov eax, cr0          ; To make the switch to protected mode, we set
-    or eax, 1             ; the first bit of CR0, a control register.
-    mov cr0, eax
-
-    jmp CODE_SEG:pm_entrypoint  ; Make a far jump (i.e. to a new segment) to our 32-bit
-                                ; code. This also forces the CPU to flush its cache of
-                                ; pre-fetched and real-mode decoded instructions,
-                                ; which can cause problems.
-
-use32
-pm_entrypoint:
-
-    ; Initialise registers and the stack once in PM.
-    mov ax, DATA_SEG    ; Now in PM, our old segments are meaningless,
-    mov ds, ax          ; so we point our segment registers to the
-    mov ss, ax          ; data selector we defined in our GDT.
     mov es, ax
     mov fs, ax
     mov gs, ax
-    mov ebp, PM_STACK_OFFSET ; Update stack position.
-    mov esp, ebp
+    mov ss, ax
 
-    call enable_long_mode
-    call set_gdt_64
+    ; Init stack.
+    mov bp, BOOTSECTOR      ; Set the stack in the Free space below the boot sector.
+    mov sp, bp
 
-    jmp CODE_SEG:lm_entrypoint
+    ; Read kernel from disk.
+    mov bx, FREESPACE       ; Offset [ES:BX] to where the data loaded from disk will be stored in memory.
+    mov al, 2               ; Read up to 2 sectors (1kb) starting from Sector2 (because Sector1 is boot sector).
+    mov dl, [BootDrive]
+    call disk_load
+
+    jmp FREESPACE
 
 
-use64
-lm_entrypoint:
-
-    jmp KERNEL_OFFSET       ; Give control to the kernel
-
-
-use16
 %include 'diskload.asm'
-%include 'print_int.asm'
-;include 'print_32bits.asm'
-use32
-%include 'gdt.asm'
-%include 'longmode.asm'
+
 
     ; Fill this sector up (510 bytes)
     times 510 - ($ - $$) db 0
@@ -118,6 +74,59 @@ use32
     dw 0xAA55
 
 ; ---
-;       Here's the end of the Sector 1 (512 bytes) and the start of Sector 2,
-;       which is loaded in KERNEL_OFFSET in memory.
+;   Here's the end of Sector 1 (512 bytes) and start of Sector 2 (512 bytes).
+;   Setup code offset is here.
+; ---
+
+    ; The "jmp FREESPACE" above will land here.
+
+FreeSpace:
+
+    ; mov bx, $
+    ; call PrintHex
+    ; hlt
+
+    ; Enable A20 Line.
+
+    in al, 0x92
+    or al, 2
+    out 0x92, al
+
+    ; Switch to LM.
+
+    mov edi, 0x1000
+    call EnableLongMode
+
+    jmp CODE_SEG:LongMode    ; Load CS with 64-bit segment and flush the instruction cache.
+                             ; Make a far jump (i.e. to a new segment) to our 64-bit
+                             ; code. This also forces the CPU to flush its cache of
+                             ; pre-fetched and real-mode decoded instructions,
+                             ; which can cause problems.
+
+
+%include 'gdt.asm'
+%include 'longmode.asm'
+
+
+use64
+LongMode:
+
+    mov ax, DATA_SEG
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+    mov ss, ax
+    mov ebp, PM_STACK ; Update stack position.
+    mov esp, ebp
+
+    ; Give control to the kernel
+    jmp KERNEL
+
+    ; Fill this sector up (512 bytes)
+    times 512 - ($ - FreeSpace) db 0
+
+; ---
+;   Here's the end of Sector 2 (512 bytes) and start of Sector 3 (512 bytes).
+;   Kernel offset is here.
 ; ---

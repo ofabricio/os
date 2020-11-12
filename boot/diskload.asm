@@ -1,3 +1,8 @@
+%ifndef __DISKLOAD__
+%define __DISKLOAD__
+
+%include 'print.asm'
+
 use16
 
 ; Load DH sectors from drive DL into ES:BX.
@@ -29,20 +34,18 @@ disk_load:
     ret
 
 .disk_error:
-    mov bx, .DISK_ERROR
-    call print
-    call printnl
+    mov si, .DISK_ERROR
+    call Print
     mov bx, ax          ; AH = error code
-    call print_hex      ; See the code at http://stanislavs.org/helppc/int_13-1.html
-    jmp .disk_loop
-
-.sectors_error:
-    mov bx, .SECTORS_ERROR
-    call print
-
-.disk_loop:
+    call PrintHex       ; See the code at http://stanislavs.org/helppc/int_13-1.html
     hlt
 
+.sectors_error:
+    mov si, .SECTORS_ERROR
+    call Print
+    hlt
 
-.DISK_ERROR: db "Disk read error", 0
-.SECTORS_ERROR: db "Incorrect number of sectors read", 0
+.DISK_ERROR db "Disk read error", 0xA, 0xD, 0
+.SECTORS_ERROR db "Incorrect number of sectors read", 0xA, 0xD, 0
+
+%endif

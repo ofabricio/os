@@ -1,11 +1,12 @@
-use64
+BITS 64
 
-section	.text
+GLOBAL _start:
 
-global _start:
+EXTERN main
+
+SECTION .text
+
 _start:
-
-extern main
 
     call main
     hlt

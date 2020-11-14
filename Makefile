@@ -6,14 +6,14 @@ os-image: clean boot.bin kernel.bin
 	cat bin/boot.bin bin/kernel.bin > bin/os.img
 
 kernel.bin: kernel_entry.o kernel.o
-	x86_64-elf-ld -T linker.ld
-	objcopy -j .text -O binary bin/kernel.elf bin/kernel.bin
+	x86_64-elf-ld --gc-sections -T linker.ld
+	objcopy -O binary bin/kernel.elf bin/kernel.bin
 
 kernel.asm.o:
 	nasm kernel/kernel.asm -f elf64 -o bin/kernel.o
 
 kernel.o: kernel/kernel.c
-	x86_64-elf-gcc -m64 -ffreestanding -nostdlib -mno-red-zone -c $^ -o bin/kernel.o
+	x86_64-elf-gcc -Os -Wl,--gc-sections -ffunction-sections -fdata-sections -Wall -m64 -ffreestanding -nostdlib -mno-red-zone -c $^ -o bin/kernel.o
 
 kernel_entry.o: kernel/kernel_entry.asm
 	nasm $^ -f elf64 -o bin/kernel_entry.o

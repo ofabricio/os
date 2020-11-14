@@ -3,6 +3,7 @@
 
 ; See: https://wiki.osdev.org/Entering_Long_Mode_Directly
 ; See: https://wiki.osdev.org/Paging
+; See: https://wiki.osdev.org/Page_Tables
 
 %include 'gdt.asm'
 %include 'print.asm'
@@ -16,15 +17,15 @@ IDT:
 
 
 ; Function to switch directly to Long Mode from Real Mode.
+;
 ; Identity maps the first 2MiB.
 ;
-;   In: ES:EDI    Should point to a valid page-aligned 16KiB buffer, for the PML4, PDPT, PD and a PT.
-;   In: SS:ESP    Should point to memory that can be used as a small (1 uint32_t) stack
+;   In: ES:EDI    Page Table address. Should point to a valid page-aligned 16KiB buffer,
+;                 for the PML4, PDPT, PD and a PT.
+;   In: SS:ESP    Should point to memory that can be used as a small (1 uint32_t) stack.
 EnableLongMode:
 
     call CheckLongMode
-
-    cld
 
     ; Zero out the 16KiB buffer.
     ; Since we are doing a rep stosd, count should be bytes/4.   
@@ -35,18 +36,22 @@ EnableLongMode:
     rep stosd
     pop di                            ; Get DI back.
 
-    ; Build the Page Map Level 4.
+    ; We're only going to make one entry for the first 3 tables
+    ; and for the last table we're going to make 512 entries.
+    ; This will map 2Mb of memory in our page table.
+
+    ; Build the Page Map Level 4 (PML4).
     ; es:di points to the Page Map Level 4 table.
     lea eax, [es:di + 0x1000]         ; Put the address of the Page Directory Pointer Table in to EAX.
     or eax, PAGE_PRESENT | PAGE_WRITE ; Or EAX with the flags - present flag, writable flag.
     mov [es:di], eax                  ; Store the value of EAX as the first PML4E.
 
-    ; Build the Page Directory Pointer Table.
+    ; Build the Page Directory Pointer Table (PDPT).
     lea eax, [es:di + 0x2000]         ; Put the address of the Page Directory in to EAX.
     or eax, PAGE_PRESENT | PAGE_WRITE ; Or EAX with the flags - present flag, writable flag.
     mov [es:di + 0x1000], eax         ; Store the value of EAX as the first PDPTE.
 
-    ; Build the Page Directory.
+    ; Build the Page Directory (PD).
     lea eax, [es:di + 0x3000]         ; Put the address of the Page Table in to EAX.
     or eax, PAGE_PRESENT | PAGE_WRITE ; Or EAX with the flags - present flag, writeable flag.
     mov [es:di + 0x2000], eax         ; Store to value of EAX as the first PDE.
@@ -55,7 +60,7 @@ EnableLongMode:
     lea di, [di + 0x3000]             ; Point DI to the page table.
     mov eax, PAGE_PRESENT | PAGE_WRITE; Move the flags into EAX - and point it to 0x0000.
 
-    ; Build the Page Table.
+    ; Build the Page Table (PT).
 .LoopPageTable:
     mov [es:di], eax
     add eax, 0x1000
@@ -85,7 +90,7 @@ EnableLongMode:
     mov cr4, eax
 
     mov edx, edi            ; Point CR3 at the PML4.
-    mov cr3, edx
+    mov cr3, edx            ; Tells the Memory Management Unit (MMU) where our page table starts.
 
     mov ecx, 0xC0000080     ; Read from the EFER MSR. 
     rdmsr

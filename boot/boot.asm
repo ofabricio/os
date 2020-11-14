@@ -94,7 +94,7 @@ FreeSpace:
 
     ; Switch to LM.
 
-    mov edi, 0x1000
+    mov edi, 0x1000          ; Page Table address.
     call EnableLongMode
 
     jmp CODE_SEG:LongMode    ; Load CS with 64-bit segment and flush the instruction cache.

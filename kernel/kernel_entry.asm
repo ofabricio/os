@@ -1,11 +1,10 @@
 BITS 64
 
-GLOBAL _start:
+SECTION .text
 
 EXTERN main
 
-SECTION .text
-
+GLOBAL _start
 _start:
 
     call main

@@ -112,11 +112,11 @@ use64
 LongMode:
 
     mov ax, DATA_SEG
-    mov ds, ax
-    mov es, ax
+    mov ds, ax          ; DS is ignored in Long Mode
+    mov es, ax          ; ES is ignored in Long Mode
     mov fs, ax
     mov gs, ax
-    mov ss, ax
+    mov ss, ax          ; SS is ignored in Long Mode
     mov ebp, PM_STACK ; Update stack position.
     mov esp, ebp
 

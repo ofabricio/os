@@ -21,7 +21,7 @@ IDT:
 ; Identity maps the first 2MiB.
 ;
 ;   In: ES:EDI    Page Table address. Should point to a valid page-aligned 16KiB buffer,
-;                 for the PML4, PDPT, PD and a PT.
+;                 for the PML4, PDPT, PD and a PT. 16Kb = 200 rows * 4 tables * 8 bytes.
 ;   In: SS:ESP    Should point to memory that can be used as a small (1 uint32_t) stack.
 EnableLongMode:
 
